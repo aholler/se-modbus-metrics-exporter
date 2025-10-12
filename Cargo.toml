@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 Alexander Holler <holler@ahsoftware.de>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+[package]
+name = "seproxy"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "^1", default-features = false, features = ["macros", "rt", "time"] }
+tokio-modbus = { version = "^0.16", default-features = false, features = ["tcp", "tcp-server"] }
+anyhow = "^1.0"
