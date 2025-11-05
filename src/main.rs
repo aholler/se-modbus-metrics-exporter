@@ -77,7 +77,7 @@ fn register_read(
     return Err(ExceptionCode::IllegalDataAddress);
 }
 
-async fn server_context(socket_addr: SocketAddr, register_blocks: Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
+async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
     println!("Starting up server on {socket_addr}");
     let listener = TcpListener::bind(socket_addr).await?;
     let server = Server::new(listener);
@@ -101,12 +101,12 @@ fn print_help(my_name: &str) {
         eprintln!("The default for update_seconds is 10.");
 }
 
-async fn update_thread(register_blocks: Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64) -> anyhow::Result<()> {
+async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64) -> anyhow::Result<()> {
     loop {
         tokio::time::sleep(Duration::from_secs(update_seconds)).await;
         let slave = Slave(0x01);
         let mut ctx = tcp::connect_slave(socket_addr, slave).await?;
-        for block in &register_blocks {
+        for block in register_blocks {
             if block.read().unwrap().update {
                 let data = ctx.read_holding_registers(block.read().unwrap().start_address, block.read().unwrap().registers.len().try_into().unwrap()).await??;
                 block.write().unwrap().registers = data;
@@ -161,11 +161,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Updating values every {}s.", update_seconds);
 
-    let blocks = register_blocks.clone();
-
     tokio::select! {
-        _ = server_context(socket_addr, register_blocks) => unreachable!(),
-        _ = update_thread(blocks, sock_addr, update_seconds) => println!("Exiting"),
+        _ = server_context(socket_addr, &register_blocks) => unreachable!(),
+        _ = update_thread(&register_blocks, sock_addr, update_seconds) => println!("Exiting"),
     }
 
     Ok(())
