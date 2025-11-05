@@ -105,14 +105,24 @@ async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket
     loop {
         tokio::time::sleep(Duration::from_secs(update_seconds)).await;
         let slave = Slave(0x01);
-        let mut ctx = tcp::connect_slave(socket_addr, slave).await?;
-        for block in register_blocks {
-            if block.read().unwrap().update {
-                let data = ctx.read_holding_registers(block.read().unwrap().start_address, block.read().unwrap().registers.len().try_into().unwrap()).await??;
-                block.write().unwrap().registers = data;
+        if let Ok(mut ctx) = tcp::connect_slave(socket_addr, slave).await {
+            for block in register_blocks {
+                if block.read().unwrap().update {
+                    let start = block.read().unwrap().start_address;
+                    let len : u16 = block.read().unwrap().registers.len().try_into().unwrap();
+                    if let Ok(Ok(data)) = ctx.read_holding_registers(start, len).await {
+                        block.write().unwrap().registers = data;
+                    } else {
+                        eprintln!("error reading values");
+                    }
+                }
             }
+            if let Err(e) = ctx.disconnect().await {
+                eprintln!("Error disconnecting ({e})");
+            }
+        } else {
+            eprintln!("Error connecting");
         }
-        ctx.disconnect().await?;
     }
 }
 
