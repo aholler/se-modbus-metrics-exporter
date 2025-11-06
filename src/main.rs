@@ -79,17 +79,20 @@ fn register_read(
 
 async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
     println!("Starting up server on {socket_addr}");
-    let listener = TcpListener::bind(socket_addr).await?;
-    let server = Server::new(listener);
-    let new_service = |_socket_addr| Ok(Some(ExampleService::new(register_blocks.clone())));
-    let on_connected = |stream, socket_addr| async move {
-        accept_tcp_connection(stream, socket_addr, new_service)
-    };
-    let on_process_error = |err| {
-        eprintln!("{err}");
-    };
-    server.serve(&on_connected, on_process_error).await?;
-    Ok(())
+    loop {
+        let listener = TcpListener::bind(socket_addr).await?;
+        let server = Server::new(listener);
+        let new_service = |_socket_addr| Ok(Some(ExampleService::new(register_blocks.clone())));
+        let on_connected = |stream, socket_addr| async move {
+            accept_tcp_connection(stream, socket_addr, new_service)
+        };
+        let on_process_error = |err| {
+            eprintln!("process error: {err}");
+        };
+        if let Err(e) = server.serve(&on_connected, on_process_error).await {
+            eprintln!("Errors starting modbus-server: {e}");
+        }
+    }
 }
 
 fn print_help(my_name: &str) {
