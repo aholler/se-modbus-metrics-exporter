@@ -7,6 +7,6 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "^1", default-features = false, features = ["macros", "rt", "time"] }
+tokio = { version = "^1", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
 tokio-modbus = { version = "^0.17", default-features = false, features = ["tcp", "tcp-server"] }
 anyhow = "^1.0"
