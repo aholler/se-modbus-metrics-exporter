@@ -68,7 +68,8 @@ fn register_read(
 ) -> Result<Vec<u16>, ExceptionCode> {
     for block in register_blocks {
         let start_addr = block.read().unwrap().start_address;
-        if addr >= start_addr && usize::from(addr + cnt) <= usize::from(start_addr) + block.read().unwrap().registers.len() {
+        let len = block.read().unwrap().registers.len();
+        if addr >= start_addr && usize::from(addr + cnt) <= usize::from(start_addr) + len {
             let data = &block.read().unwrap().registers;
             return Ok(data[usize::from(addr-start_addr)..usize::from(addr-start_addr+cnt)].to_vec());
         }
@@ -106,12 +107,13 @@ fn print_help(my_name: &str) {
 
 async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64) -> anyhow::Result<()> {
     println!("Updating values every {}s.", update_seconds);
+    let slave = Slave(0x01);
     loop {
         tokio::time::sleep(Duration::from_secs(update_seconds)).await;
-        let slave = Slave(0x01);
         if let Ok(mut ctx) = tcp::connect_slave(socket_addr, slave).await {
             for block in register_blocks {
-                if block.read().unwrap().update {
+                let update = block.read().unwrap().update;
+                if update {
                     let start = block.read().unwrap().start_address;
                     let len : u16 = block.read().unwrap().registers.len().try_into().unwrap();
                     if let Ok(Ok(data)) = ctx.read_holding_registers(start, len).await {
