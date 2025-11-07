@@ -78,7 +78,7 @@ fn register_read(
 }
 
 async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
-    println!("Starting up server on {socket_addr}");
+    println!("Starting up modbus-tcp-server on {socket_addr}");
     loop {
         let listener = TcpListener::bind(socket_addr).await?;
         let server = Server::new(listener);
@@ -105,6 +105,7 @@ fn print_help(my_name: &str) {
 }
 
 async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64) -> anyhow::Result<()> {
+    println!("Updating values every {}s.", update_seconds);
     loop {
         tokio::time::sleep(Duration::from_secs(update_seconds)).await;
         let slave = Slave(0x01);
@@ -172,12 +173,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     ctx.disconnect().await?;
 
-    println!("Updating values every {}s.", update_seconds);
-
-    tokio::select! {
-        _ = server_context(socket_addr, &register_blocks) => unreachable!(),
-        _ = update_thread(&register_blocks, sock_addr, update_seconds) => println!("Exiting"),
-    }
+    let regs = register_blocks.clone();
+    let modbus_future = server_context(socket_addr, &regs);
+    let update_future = update_thread(&register_blocks, sock_addr, update_seconds);
+    let _ = tokio::join!(
+        modbus_future,
+        update_future,
+    );
 
     Ok(())
 }
