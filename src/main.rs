@@ -18,7 +18,14 @@ use tokio::net::TcpListener;
 
 use tokio_modbus::{
     prelude::*,
-    server::tcp::{accept_tcp_connection, Server},
+    server::tcp::accept_tcp_connection,
+};
+
+use axum::{
+    routing::get,
+    extract::State,
+    Router,
+    response::Html,
 };
 
 struct RegisterBlock {
@@ -82,7 +89,7 @@ async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLoc
     println!("Starting up modbus-tcp-server on {socket_addr}");
     loop {
         let listener = TcpListener::bind(socket_addr).await?;
-        let server = Server::new(listener);
+        let server = tokio_modbus::server::tcp::Server::new(listener);
         let new_service = |_socket_addr| Ok(Some(ExampleService::new(register_blocks.clone())));
         let on_connected = |stream, socket_addr| async move {
             accept_tcp_connection(stream, socket_addr, new_service)
@@ -98,10 +105,10 @@ async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLoc
 
 fn print_help(my_name: &str) {
         eprintln!("Usage:");
-        eprintln!("\t{} ip:port server_ip:port [update_seconds]", my_name);
+        eprintln!("\t{} ip_inverter:port listen_ip_modbus:port listen_ip_http:port [update_seconds]", my_name);
         eprintln!("Examples:");
-        eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502", my_name);
-        eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 20", my_name);
+        eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 127.0.0.1:5503 ", my_name);
+        eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 0.0.0.0:5503 20", my_name);
         eprintln!("The default for update_seconds is 10.");
 }
 
@@ -132,6 +139,89 @@ async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket
     }
 }
 
+fn v_u16_to_f32(data: &Vec<u16>) -> f32 {
+    let bytes: Vec<u8> = data.iter().fold(vec![], |mut x, elem| {
+        x.push((elem & 0xff) as u8);
+        x.push((elem >> 8) as u8);
+        x
+    });
+    let b: [u8; 4] = bytes.try_into().unwrap();
+    return f32::from_ne_bytes(b);
+}
+
+fn get_f32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u16) -> f32 {
+    for block in register_blocks {
+        let start_addr = block.read().unwrap().start_address;
+        let len = block.read().unwrap().registers.len();
+        if addr >= start_addr && usize::from(addr + 2) <= usize::from(start_addr) + len {
+            let data = &block.read().unwrap().registers;
+            return v_u16_to_f32(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+2)].to_vec());
+        }
+    }
+    0.0
+}
+
+fn scale(val: u16, scale: u16) -> f32 {
+    return val as i16 as f32 * 10_f32.powi((scale as i16).into());
+}
+
+fn get_scaled_f32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u16, scale_addr: u16) -> f32 {
+    for block in register_blocks {
+        let start_addr = block.read().unwrap().start_address;
+        let len = block.read().unwrap().registers.len();
+        if addr >= start_addr && usize::from(addr + 1) <= usize::from(start_addr) + len
+            && scale_addr >= start_addr && usize::from(scale_addr + 1) <= usize::from(start_addr) + len {
+            let data = &block.read().unwrap().registers;
+            return scale(data[usize::from(addr-start_addr)], data[usize::from(scale_addr-start_addr)]);
+        }
+    }
+    0.0
+}
+
+async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>>>) -> Html<String> {
+    let regs = state.read().unwrap();
+
+    let battery_soc = get_f32_from_regs(&regs, 0xf584);
+    let battery_power = get_f32_from_regs(&regs, 0xf574);
+    let battery_health = get_f32_from_regs(&regs, 0xf582);
+
+     let head = "<head><meta http-equiv='refresh' content='30'><title>PV-Status</title></head>";
+     let power = if battery_power < 0.0 {
+             format!("<font color='red'>{battery_power:.0}W</font>")
+         } else {
+             format!("<font color='green'>{battery_power:.0}W</font>")
+        };
+     let battery = format!("Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%");
+
+     let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
+     let ac = format!("AC {ac_power:.0}W");
+
+     let dc_power = get_scaled_f32_from_regs(&regs, 40071+29, 40071+30);
+     let dc = format!("DC {dc_power:.0}W");
+
+     let real_power = get_scaled_f32_from_regs(&regs, 40190+16, 40190+20);
+     let r_power = if real_power < 0.0 {
+             format!("<font color='red'>{real_power:.0}W</font>") // vom Netz
+         } else {
+             format!("<font color='green'>{real_power:.0}W</font>") // Einspeisung
+        };
+
+     let frequency = get_scaled_f32_from_regs(&regs, 40190+14, 40190+15);
+     let body = format!("<body><h1>{battery}</h1><h1>Wechselrichter&colon; {ac} {dc}</h1><h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1></body>");
+     ("<!doctype html><html lang='de'>".to_owned() + head + &body + "</html>").into()
+}
+
+async fn http_server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
+    let shared_state = Arc::new(RwLock::new(register_blocks.clone()));
+    let app = Router::new()
+        .route("/", get(handler))
+        .with_state(shared_state);
+    println!("Starting up http-server on {socket_addr}");
+    let listener = TcpListener::bind(socket_addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+    Ok(())
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -139,15 +229,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 3 && args.len() != 4 {
+    if args.len() != 4 && args.len() != 5 {
         print_help(&args[0]);
         std::process::exit(1)
     }
 
     let sock_addr = args[1].parse().unwrap();
     let socket_addr = args[2].parse().unwrap();
-    let update_seconds = if args.len() == 4 {
-        args[3].parse().unwrap()
+    let socket_addr_http = args[3].parse().unwrap();
+    let update_seconds = if args.len() == 5 {
+        args[4].parse().unwrap()
     } else {
         10
     };
@@ -178,9 +269,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let regs = register_blocks.clone();
     let modbus_future = server_context(socket_addr, &regs);
     let update_future = update_thread(&register_blocks, sock_addr, update_seconds);
+    let regs2 = register_blocks.clone();
+    let http_future = http_server_context(socket_addr_http, &regs2);
+
     let _ = tokio::join!(
         modbus_future,
         update_future,
+        http_future,
     );
 
     Ok(())
