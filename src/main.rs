@@ -104,12 +104,12 @@ async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLoc
 }
 
 fn print_help(my_name: &str) {
-        eprintln!("Usage:");
-        eprintln!("\t{} ip_inverter:port listen_ip_modbus:port listen_ip_http:port [update_seconds]", my_name);
-        eprintln!("Examples:");
-        eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 127.0.0.1:5503 ", my_name);
-        eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 0.0.0.0:5503 20", my_name);
-        eprintln!("The default for update_seconds is 10.");
+    eprintln!("Usage:");
+    eprintln!("\t{} ip_inverter:port listen_ip_modbus:port listen_ip_http:port [update_seconds]", my_name);
+    eprintln!("Examples:");
+    eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 127.0.0.1:5503 ", my_name);
+    eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 0.0.0.0:5503 20", my_name);
+    eprintln!("The default for update_seconds is 10.");
 }
 
 async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64) -> anyhow::Result<()> {
@@ -185,30 +185,30 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     let battery_power = get_f32_from_regs(&regs, 0xf574);
     let battery_health = get_f32_from_regs(&regs, 0xf582);
 
-     let head = "<head><meta http-equiv='refresh' content='30'><title>PV-Status</title></head>";
-     let power = if battery_power < 0.0 {
-             format!("<font color='red'>{battery_power:.0}W</font>")
-         } else {
-             format!("<font color='green'>{battery_power:.0}W</font>")
-        };
-     let battery = format!("Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%");
+    let head = "<head><meta http-equiv='refresh' content='30'><title>PV-Status</title></head>";
+    let power = if battery_power < 0.0 {
+            format!("<font color='red'>{battery_power:.0}W</font>")
+        } else {
+            format!("<font color='green'>{battery_power:.0}W</font>")
+       };
+    let battery = format!("Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%");
 
-     let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
-     let ac = format!("AC {ac_power:.0}W");
+    let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
+    let ac = format!("AC {ac_power:.0}W");
 
-     let dc_power = get_scaled_f32_from_regs(&regs, 40071+29, 40071+30);
-     let dc = format!("DC {dc_power:.0}W");
+    let dc_power = get_scaled_f32_from_regs(&regs, 40071+29, 40071+30);
+    let dc = format!("DC {dc_power:.0}W");
 
-     let real_power = get_scaled_f32_from_regs(&regs, 40190+16, 40190+20);
-     let r_power = if real_power < 0.0 {
-             format!("<font color='red'>{real_power:.0}W</font>") // vom Netz
-         } else {
-             format!("<font color='green'>{real_power:.0}W</font>") // Einspeisung
-        };
+    let real_power = get_scaled_f32_from_regs(&regs, 40190+16, 40190+20);
+    let r_power = if real_power < 0.0 {
+            format!("<font color='red'>{real_power:.0}W</font>") // vom Netz
+        } else {
+            format!("<font color='green'>{real_power:.0}W</font>") // Einspeisung
+       };
 
-     let frequency = get_scaled_f32_from_regs(&regs, 40190+14, 40190+15);
-     let body = format!("<body><h1>{battery}</h1><h1>Wechselrichter&colon; {ac} {dc}</h1><h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1></body>");
-     ("<!doctype html><html lang='de'>".to_owned() + head + &body + "</html>").into()
+    let frequency = get_scaled_f32_from_regs(&regs, 40190+14, 40190+15);
+    let body = format!("<body><h1>{battery}</h1><h1>Wechselrichter&colon; {ac} {dc}</h1><h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1></body>");
+    ("<!doctype html><html lang='de'>".to_owned() + head + &body + "</html>").into()
 }
 
 async fn http_server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
