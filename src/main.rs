@@ -207,7 +207,11 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
        };
 
     let frequency = get_scaled_f32_from_regs(&regs, 40190+14, 40190+15);
-    let body = format!("<body><h1>{battery}</h1><h1>Wechselrichter&colon; {ac} {dc}</h1><h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1></body>");
+
+    let pv_power = ac_power + battery_power;
+    let home_power = ac_power - real_power;
+
+    let body = format!("<body><h1>{battery}</h1><h1>Wechselrichter&colon; {ac} {dc}</h1><h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1><h1>Produktion&colon; {pv_power:.0}W (AC + Batterie)</h1><h1>Hausverbrauch&colon; {home_power:.0}W (AC - Z&auml;hler)</h1></body>");
     ("<!doctype html><html lang='de'>".to_owned() + head + &body + "</html>").into()
 }
 
