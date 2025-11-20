@@ -8,11 +8,16 @@ use tokio;
 
 use std::{
     env,
+    fs::File,
     future,
+    io::BufReader,
+    io::Read,
     net::SocketAddr,
     sync::{Arc, RwLock},
     time::Duration,
 };
+
+use yaml_rust::YamlLoader;
 
 use tokio::net::TcpListener;
 
@@ -32,6 +37,34 @@ struct RegisterBlock {
     start_address: u16,
     update: bool,
     registers: Vec<u16>,
+}
+
+struct RegisterBlockDefinition {
+    start_address: u16,
+    size: u16,
+    update: bool,
+}
+
+struct Config {
+    ip_inverter_modbus: String,
+    listen_ip_modbus: String,
+    listen_ip_http: String,
+    slave_id_modbus: u8,
+    update_interval_seconds: u64,
+    register_blocks: Vec<RegisterBlockDefinition>,
+}
+
+impl Config {
+    fn new() -> Self {
+        Self {
+            ip_inverter_modbus: "".to_string(),
+            listen_ip_modbus: "".to_string(),
+            listen_ip_http: "".to_string(),
+            slave_id_modbus: 1,
+            update_interval_seconds: 10,
+            register_blocks: Vec::new(),
+        }
+    }
 }
 
 struct ExampleService {
@@ -103,18 +136,9 @@ async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLoc
     }
 }
 
-fn print_help(my_name: &str) {
-    eprintln!("Usage:");
-    eprintln!("\t{} ip_inverter:port listen_ip_modbus:port listen_ip_http:port [update_seconds]", my_name);
-    eprintln!("Examples:");
-    eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 127.0.0.1:5503 ", my_name);
-    eprintln!("\t{} 127.0.0.1:1502 127.0.0.1:5502 0.0.0.0:5503 20", my_name);
-    eprintln!("The default for update_seconds is 10.");
-}
-
-async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64) -> anyhow::Result<()> {
+async fn update_thread(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, socket_addr: SocketAddr, update_seconds: u64, slave_id: u8) -> anyhow::Result<()> {
     println!("Updating values every {}s.", update_seconds);
-    let slave = Slave(0x01);
+    let slave = Slave(slave_id);
     loop {
         tokio::time::sleep(Duration::from_secs(update_seconds)).await;
         if let Ok(mut ctx) = tcp::connect_slave(socket_addr, slave).await {
@@ -226,6 +250,29 @@ async fn http_server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<
     Ok(())
 }
 
+fn read_config(filename: &str) -> Result<Config, std::io::Error> {
+    let mut config_reader = BufReader::new(File::open(filename)?);
+    let mut config_str = String::new();
+    config_reader.read_to_string(&mut config_str)?;
+    let config = YamlLoader::load_from_str(&config_str).unwrap();
+    let mut config_s = Config::new();
+    config_s.ip_inverter_modbus = config[0]["ipPortInverter"].as_str().unwrap().to_string();
+    config_s.listen_ip_modbus = config[0]["ipPortModbus"].as_str().unwrap().to_string();
+    config_s.listen_ip_http = config[0]["ipPortHttp"].as_str().unwrap().to_string();
+    config_s.update_interval_seconds = u64::try_from(config[0]["updateIntervalSeconds"].as_i64().unwrap()).unwrap();
+    config_s.slave_id_modbus = u8::try_from(config[0]["slaveIdModbus"].as_i64().unwrap()).unwrap();
+    if let Some(vec) = config[0]["registerBlocks"].as_vec() {
+        for v in vec {
+            config_s.register_blocks.push(RegisterBlockDefinition{
+                start_address: u16::try_from(v["startAddress"].as_i64().unwrap()).unwrap(),
+                size: u16::try_from(v["size"].as_i64().unwrap()).unwrap(),
+                update: v["update"].as_bool().unwrap(),
+            });
+        }
+    }
+    Ok(config_s)
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -233,38 +280,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 4 && args.len() != 5 {
-        print_help(&args[0]);
+    let my_name = &args[0];
+    let mut config_name = my_name.to_owned() + ".yaml";
+
+    if args.len() != 1 && args.len() != 2 {
+        eprintln!("Usage:");
+        eprintln!("\t{} [config.yaml]", my_name);
+        eprintln!("If config.yaml is not given '{}' will be used.", config_name);
         std::process::exit(1)
     }
 
-    let sock_addr = args[1].parse().unwrap();
-    let socket_addr = args[2].parse().unwrap();
-    let socket_addr_http = args[3].parse().unwrap();
-    let update_seconds = if args.len() == 5 {
-        args[4].parse().unwrap()
-    } else {
-        10
+    if args.len() == 2 {
+        config_name = args[1].clone();
+    }
+
+    let config = match read_config(&config_name) {
+        Err(e) => { eprintln!("Error reading config '{}': {}", config_name, e); std::process::exit(1) }
+        Ok(c) => c
     };
+
+    let sock_addr = config.ip_inverter_modbus.parse().unwrap();
+    let socket_addr = config.listen_ip_modbus.parse().unwrap();
+    let socket_addr_http = config.listen_ip_http.parse().unwrap();
 
     let mut register_blocks: Vec<Arc<RwLock<RegisterBlock>>> = Vec::new();
 
-    let slave = Slave(0x01);
+    let slave = Slave(config.slave_id_modbus);
     let mut ctx = tcp::connect_slave(sock_addr, slave).await?;
 
     println!("Fetching from {sock_addr} ...");
 
-    let data_battery = ctx.read_holding_registers(62836, 18).await??;
-    register_blocks.push(Arc::new(RwLock::new(RegisterBlock{start_address: 62836, update: true, registers: data_battery})));
-
-    let data_inverter = ctx.read_holding_registers(40072, 30).await??;
-    register_blocks.push(Arc::new(RwLock::new(RegisterBlock{start_address: 40072, update: true, registers: data_inverter})));
-
-    let data_meter_option = ctx.read_holding_registers(40155, 8).await??;
-    register_blocks.push(Arc::new(RwLock::new(RegisterBlock{start_address: 40155, update: false, registers: data_meter_option})));
-
-    let data_meter = ctx.read_holding_registers(40191, 52).await??;
-    register_blocks.push(Arc::new(RwLock::new(RegisterBlock{start_address: 40191, update: true, registers: data_meter})));
+    for block in config.register_blocks {
+        let data = ctx.read_holding_registers(block.start_address, block.size).await??;
+        register_blocks.push(Arc::new(RwLock::new(RegisterBlock{start_address: block.start_address, update: block.update, registers: data})));
+    }
 
     println!("Disconnecting");
 
@@ -272,7 +321,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let regs = register_blocks.clone();
     let modbus_future = server_context(socket_addr, &regs);
-    let update_future = update_thread(&register_blocks, sock_addr, update_seconds);
+    let update_future = update_thread(&register_blocks, sock_addr, config.update_interval_seconds, config.slave_id_modbus);
     let regs2 = register_blocks.clone();
     let http_future = http_server_context(socket_addr_http, &regs2);
 

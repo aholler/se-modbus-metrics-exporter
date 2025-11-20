@@ -19,20 +19,17 @@ Just call make to build it.
 Alexander Holler
 
 
-    user@host:~/Source/seproxy.git$ target/release/seproxy
+    user@host:~/Source/seproxy.git$ target/release/seproxy please help
 
-    seproxy v1.1.0
+    seproxy v1.2.0
 
     Usage:
-        target/release/seproxy ip_inverter:port listen_ip_modbus:port listen_ip_http:port [update_seconds]
-    Examples:
-        target/release/seproxy 127.0.0.1:1502 127.0.0.1:5502 127.0.0.1:5503
-        target/release/seproxy 127.0.0.1:1502 127.0.0.1:5502 0.0.0.0:5503 20
-    The default for update_seconds is 10.
+        target/release/seproxy [config.yaml]
+    If config.yaml is not given 'target/release/seproxy.yaml' will be used.
 
-    user@host:~/Source/seproxy.git$ target/release/seproxy 127.0.0.1:1502 127.0.0.1:5502 0.0.0.0:5503
+    user@host:~/Source/seproxy.git$ target/release/seproxy config.yaml
 
-    seproxy v1.1.0
+    seproxy v1.2.0
 
     Fetching from 127.0.0.1:1502 ...
     Disconnecting

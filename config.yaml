@@ -1,0 +1,40 @@
+# The IP and port of the modbus-tcp of the inverter
+# This is where the modbus-registers are fetched from.
+ipPortInverter: 127.0.0.1:1502
+
+# The IP and port where the modbus-server should listen on
+# Use 0.0.0.0 as IP for all (local) IPs.
+ipPortModbus: 127.0.0.1:5502
+
+# The IP and port where the http-server should listen on
+# Use 0.0.0.0 as IP for all (local) IPs.
+ipPortHttp: 0.0.0.0:5503
+
+# The interval in seconds for updating the modbus-registers
+updateIntervalSeconds: 10
+
+# the modbus slave id to fetch the date from
+slaveIdModbus: 1
+
+# The registers to mirror with the modbus-server
+# If update is false, the block in question will only be fetched once
+# and never updated again.
+# The values below are the minimal set of registers an openWB wallbox
+# requests from a SolarEdge PV.
+registerBlocks:
+  # inverter
+  - startAddress: 40072
+    size: 30
+    update: true
+  # meter option
+  - startAddress: 40155
+    size: 8
+    update: false
+  # meter
+  - startAddress: 40191
+    size: 52
+    update: true
+  # battery
+  - startAddress: 62836
+    size: 18
+    update: true
