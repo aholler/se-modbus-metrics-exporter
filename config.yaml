@@ -1,12 +1,12 @@
-# The IP and port of the modbus-tcp of the inverter
+# The IP/host and port of the modbus-tcp of the inverter
 # This is where the modbus-registers are fetched from.
-ipPortInverter: 127.0.0.1:1502
+ipPortInverter: localhost:1502
 
-# The IP and port where the modbus-server should listen on
+# The IP/host and port where the modbus-server should listen on
 # Use 0.0.0.0 as IP for all (local) IPs.
 ipPortModbus: 127.0.0.1:5502
 
-# The IP and port where the http-server should listen on
+# The IP/host and port where the http-server should listen on
 # Use 0.0.0.0 as IP for all (local) IPs.
 ipPortHttp: 0.0.0.0:5503
 

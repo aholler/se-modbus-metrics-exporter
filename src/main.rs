@@ -12,7 +12,7 @@ use std::{
     future,
     io::BufReader,
     io::Read,
-    net::SocketAddr,
+    net::{SocketAddr, ToSocketAddrs},
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -299,9 +299,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(c) => c
     };
 
-    let sock_addr = config.ip_inverter_modbus.parse().unwrap();
-    let socket_addr = config.listen_ip_modbus.parse().unwrap();
-    let socket_addr_http = config.listen_ip_http.parse().unwrap();
+    let sock_addr = config.ip_inverter_modbus.to_socket_addrs().unwrap().next().unwrap();
+    let socket_addr = config.listen_ip_modbus.to_socket_addrs().unwrap().next().unwrap();
+    let socket_addr_http = config.listen_ip_http.to_socket_addrs().unwrap().next().unwrap();
 
     let mut register_blocks: Vec<Arc<RwLock<RegisterBlock>>> = Vec::new();
 
