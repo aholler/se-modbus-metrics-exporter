@@ -239,9 +239,38 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     ("<!doctype html><html lang='de'>".to_owned() + head + &body + "</html>").into()
 }
 
+async fn metrics(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>>>) -> String {
+    let regs = state.read().unwrap();
+
+    let mut response = "".to_string();
+
+    let real_power = get_scaled_f32_from_regs(&regs, 40190+16, 40190+20);
+    response = response + "# HELP sunspec_ac_meter_abcn_W_W Model 203, ac_meter_abcn (wye-connect three phase (abcn) meter)\\nW (Watts): Total Real Power\n";
+    response = response + "# TYPE sunspec_ac_meter_abcn_W_W gauge\n";
+    response = response + format!("sunspec_ac_meter_abcn_W_W {real_power:.0}\n").as_str();
+
+    let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
+    response = response + "# HELP sunspec_inverter_three_phase_W_W Model 103, inverter_three_phase (Inverter (Three Phase))\\nW (Watts): AC Power\n";
+    response = response + "# TYPE sunspec_inverter_three_phase_W_W gauge\n";
+    response = response + format!("sunspec_inverter_three_phase_W_W {ac_power:.0}\n").as_str();
+
+    let battery_soc = get_f32_from_regs(&regs, 0xf584);
+    response = response + "# HELP solaredge_Battery_1_State_of_Energy_Pct\\nPct (Percent)\n";
+    response = response + "# TYPE solaredge_Battery_1_State_of_Energy_Pct gauge\n";
+    response = response + format!("solaredge_Battery_1_State_of_Energy_Pct {battery_soc:.0}\n").as_str();
+
+    let battery_power = get_f32_from_regs(&regs, 0xf574);
+    response = response + "# HELP solaredge_Battery_1_Instantaneous_Power_W_W\\nW (Watts)\n";
+    response = response + "# TYPE solaredge_Battery_1_Instantaneous_Power_W_W gauge\n";
+    response = response + format!("solaredge_Battery_1_Instantaneous_Power_W_W {battery_power:.0}\n").as_str();
+
+    response
+}
+
 async fn http_server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>) -> anyhow::Result<()> {
     let shared_state = Arc::new(RwLock::new(register_blocks.clone()));
     let app = Router::new()
+        .route("/metrics", get(metrics))
         .route("/", get(handler))
         .with_state(shared_state);
     println!("Starting up http-server on {socket_addr}");
