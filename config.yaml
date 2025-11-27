@@ -26,11 +26,12 @@ registerBlocks:
   - startAddress: 40072
     size: 30
     update: true
-  # meter option
-  - startAddress: 40155
-    size: 8
-    update: false
-  # meter
+  # meter 1 option
+  # included in the static values below
+  #- startAddress: 40155
+  #  size: 8
+  #  update: false
+  # meter 1
   - startAddress: 40191
     size: 52
     update: true
@@ -38,3 +39,13 @@ registerBlocks:
   - startAddress: 62836
     size: 18
     update: true
+  # The following values are not used by open WB.
+  # But they are static, not updated and might be used by other stuff.
+  # inverter common block
+  - startAddress: 40000
+    size: 63
+    update: false
+  # meter 1 common block
+  - startAddress: 40121
+    size: 69
+    update: false
