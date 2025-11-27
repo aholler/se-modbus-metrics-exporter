@@ -1,35 +1,47 @@
 <!-- SPDX-FileCopyrightText: Copyright (c) 2025 Alexander Holler <holler@ahsoftware.de> -->
 <!-- SPDX-License-Identifier: MIT OR Apache-2.0 -->
 
-seproxy
----------
+se-modbus-metrics-exporter
+--------------------------
 
 According to the SolarEdge documentation, the MODBUS TCP implementation
-of SolarEdge inverters are supporting only a single connection and
-session.
-In order to circumvent this limitation I've written seproxy using Rust.
-When started, if fetches a set of registers from the SolarEdge device
-and updates the values every 10 seconds. Currently the set of registers
-are hardcoded to those needed to use an openWB wallbox (the register which
-are queried by openWB). The number of clients and sessions which can query
-seproxy isn't restricted.
+of SolarEdge inverters supports only a single connection and session. This
+makes it almost impossible to use the values by multiple means.
+In order to circumvent this limitation I've written this tool using Rust.
+When started, if fetches a configured set of registers from the SolarEdge
+device, updates values (by default) every 10 seconds and offers them via
+a modbus-TCP-server. Furthermore it shows some values via http (at /) and
+offers some metrics (at /metrics) for scraping by prometheus. This makes it
+possible to display timelines e.g. by using Grafana.
 
 Just call make to build it.
+
+Scraping the metrics with prometheus can be done e.g. with the
+following in the config of prometheus:
+
+    scrape_configs:
+      - job_name: 'solaredge'
+        static_configs:
+          - targets: ['127.0.0.1:5503']
+        metrics_path: /metrics
+        scheme: http
+        scrape_interval: 4m
+        scrape_timeout: 10s
 
 Alexander Holler
 
 
-    user@host:~/Source/seproxy.git$ target/release/seproxy please help
+    user@host:~/Source/se-modbus-metrics-exporter.git$ target/release/se-modbus-metrics-exporter please help
 
-    seproxy v1.2.0
+    se-modbus-metrics-exporter v1.3.0
 
     Usage:
-        target/release/seproxy [config.yaml]
-    If config.yaml is not given 'target/release/seproxy.yaml' will be used.
+        target/release/se-modbus-metrics-exporter [config.yaml]
+    If config.yaml is not given 'target/release/se-modbus-metrics-exporter.yaml' will be used.
 
-    user@host:~/Source/seproxy.git$ target/release/seproxy config.yaml
+    user@host:~/Source/se-modbus-metrics-exporter.git$ target/release/se-modbus-metrics-exporter config.yaml
 
-    seproxy v1.2.0
+    se-modbus-metrics-exporter v1.3.0
 
     Fetching from 127.0.0.1:1502 ...
     Disconnecting
