@@ -6,7 +6,8 @@ se-modbus-metrics-exporter
 
 According to the SolarEdge documentation, the MODBUS TCP implementation
 of SolarEdge inverters supports only a single connection and session. This
-makes it almost impossible to use the values by multiple means.
+makes it almost impossible to use the values by multiple means (like e.g.
+2 wallboxes).
 In order to circumvent this limitation I've written this tool using Rust.
 When started, if fetches a configured set of registers from the SolarEdge
 device, updates values (by default) every 10 seconds and offers them via
