@@ -305,7 +305,7 @@ fn read_config(filename: &str) -> Result<Config, std::io::Error> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
-    println!("\nseproxy v{}\n", env!("CARGO_PKG_VERSION"));
+    println!("\n{} v{}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
     let args: Vec<String> = env::args().collect();
 
