@@ -202,6 +202,30 @@ fn get_scaled_f32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, a
     0.0
 }
 
+fn v_u16_to_u32(data: &Vec<u16>) -> u32 {
+    let mut rc0: u32 = data[0].into();
+    rc0 <<= 16;
+    let rc1: u32 = data[1].into();
+    return rc0 + rc1;
+}
+
+fn scale_u32(val: u32, scale: u16) -> f32 {
+    return val as f32 * 10_f32.powi((scale as i16).into());
+}
+
+fn get_scaled_u32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u16, scale_addr: u16) -> f32 {
+    for block in register_blocks {
+        let start_addr = block.read().unwrap().start_address;
+        let len = block.read().unwrap().registers.len();
+        if addr >= start_addr && usize::from(addr + 1) <= usize::from(start_addr) + len
+            && scale_addr >= start_addr && usize::from(scale_addr + 1) <= usize::from(start_addr) + len {
+            let data = &block.read().unwrap().registers;
+            return scale_u32(v_u16_to_u32(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+2)].to_vec()), data[usize::from(scale_addr-start_addr)]);
+        }
+    }
+    0.0
+}
+
 async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>>>) -> Html<String> {
     let regs = state.read().unwrap();
 
@@ -231,6 +255,8 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
        };
 
     let frequency = get_scaled_f32_from_regs(&regs, 40190+14, 40190+15);
+    let total_exported_kwh = get_scaled_u32_from_regs(&regs, 40226, 40242)/1000.;
+    let total_imported_kwh = get_scaled_u32_from_regs(&regs, 40234, 40242)/1000.;
 
     let pv_power = ac_power + battery_power;
     let home_power = ac_power - real_power;
@@ -239,6 +265,7 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     body = body + format!("<h1>{battery}</h1>").as_str();
     body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
     body = body + format!("<h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1>").as_str();
+    body = body + format!("<h1>exportiert (gesamt)&colon; {total_exported_kwh:.2}kWh importiert (gesamt) {total_imported_kwh:.2}kWh</h1>").as_str();
     body = body + format!("<h1>Produktion&colon; {pv_power:.0}W (AC + Batterie)</h1>").as_str();
     body = body + format!("<h1>Hausverbrauch&colon; {home_power:.0}W (AC - Z&auml;hler)</h1>").as_str();
     body = body + "</body>";
