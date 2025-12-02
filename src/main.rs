@@ -297,6 +297,16 @@ async fn metrics(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     response = response + "# TYPE solaredge_Battery_1_Instantaneous_Power_W_W gauge\n";
     response = response + format!("solaredge_Battery_1_Instantaneous_Power_W_W {battery_power:.0}\n").as_str();
 
+    let total_exported_wh = get_scaled_u32_from_regs(&regs, 40226, 40242);
+    response = response + "# HELP sunspec_ac_meter_abcn_TotWhExp_Wh Model 203, ac_meter_abcn (wye-connect three phase (abcn) meter)\\nTotWhExp (Total Watt-hours Exported): Total Real Energy Exported\n";
+    response = response + "# TYPE sunspec_ac_meter_abcn_TotWhExp_Wh counter\n";
+    response = response + format!("sunspec_ac_meter_abcn_TotWhExp_Wh {total_exported_wh:.0}\n").as_str();
+
+    let total_imported_wh = get_scaled_u32_from_regs(&regs, 40234, 40242);
+    response = response + "# HELP sunspec_ac_meter_abcn_TotWhImp_Wh Model 203, ac_meter_abcn (wye-connect three phase (abcn) meter)\\nTotWhImp (Total Watt-hours Imported): Total Real Energy Imported\n";
+    response = response + "# TYPE sunspec_ac_meter_abcn_TotWhImp_Wh counter\n";
+    response = response + format!("sunspec_ac_meter_abcn_TotWhImp_Wh {total_imported_wh:.0}\n").as_str();
+
     response
 }
 
