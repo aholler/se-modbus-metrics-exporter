@@ -290,6 +290,11 @@ async fn metrics(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     response = response + "# TYPE sunspec_inverter_three_phase_W_W gauge\n";
     response = response + format!("sunspec_inverter_three_phase_W_W {ac_power:.0}\n").as_str();
 
+    let ac_lifetime_energy_production_wh = get_scaled_u32_from_regs(&regs, 40093, 40095);
+    response = response + "# HELP sunspec_inverter_three_phase_WH_Wh Model 103, inverter_three_phase (Inverter (Three Phase)): AC Lifetime Energy\n";
+    response = response + "# TYPE sunspec_inverter_three_phase_WH_Wh counter\n";
+    response = response + format!("sunspec_inverter_three_phase_WH_Wh {ac_lifetime_energy_production_wh:.0}\n").as_str();
+
     let battery_soc = get_f32_from_regs(&regs, 0xf584);
     response = response + "# HELP solaredge_Battery_1_State_of_Energy_Pct\\nPct (Percent)\n";
     response = response + "# TYPE solaredge_Battery_1_State_of_Energy_Pct gauge\n";
