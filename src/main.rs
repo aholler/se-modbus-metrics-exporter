@@ -258,12 +258,15 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     let total_exported_kwh = get_scaled_u32_from_regs(&regs, 40226, 40242)/1000.;
     let total_imported_kwh = get_scaled_u32_from_regs(&regs, 40234, 40242)/1000.;
 
+    let ac_lifetime_energy_production_kwh = get_scaled_u32_from_regs(&regs, 40093, 40095) / 1000.;
+
     let pv_power = ac_power + battery_power;
     let home_power = ac_power - real_power;
 
     let mut body = "<body>".to_string();
     body = body + format!("<h1>{battery}</h1>").as_str();
     body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
+    body = body + format!("<h1>AC produziert (gesamt)&colon; {ac_lifetime_energy_production_kwh:.2}kWh</h1>").as_str();
     body = body + format!("<h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1>").as_str();
     body = body + format!("<h1>exportiert (gesamt)&colon; {total_exported_kwh:.2}kWh importiert (gesamt) {total_imported_kwh:.2}kWh</h1>").as_str();
     body = body + format!("<h1>Produktion&colon; {pv_power:.0}W (AC + Batterie)</h1>").as_str();
