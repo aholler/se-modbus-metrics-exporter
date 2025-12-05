@@ -226,6 +226,39 @@ fn get_scaled_u32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, a
     0.0
 }
 
+fn v_u16_to_string(data: &Vec<u16>) -> String {
+    let bytes: Vec<u8> = data.iter().fold(vec![], |mut x, elem| {
+        x.push((elem >> 8) as u8);
+        x.push((elem & 0xff) as u8);
+        x
+    });
+    String::from_utf8(bytes).unwrap()
+}
+
+fn get_string_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u16, size: u16) -> String {
+    for block in register_blocks {
+        let start_addr = block.read().unwrap().start_address;
+        let len = block.read().unwrap().registers.len();
+        if addr >= start_addr && usize::from(addr + size) <= usize::from(start_addr) + len {
+            let data = &block.read().unwrap().registers;
+            return v_u16_to_string(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+size)].to_vec());
+        }
+    }
+    "".to_string()
+}
+
+fn get_u16_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u16) -> u16 {
+    for block in register_blocks {
+        let start_addr = block.read().unwrap().start_address;
+        let len = block.read().unwrap().registers.len();
+        if addr >= start_addr && usize::from(addr + 2) <= usize::from(start_addr) + len {
+            let data = &block.read().unwrap().registers;
+            return data[usize::from(addr-start_addr)];
+        }
+    }
+    0
+}
+
 async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>>>) -> Html<String> {
     let regs = state.read().unwrap();
 
@@ -263,16 +296,33 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     let pv_power = ac_power + battery_power;
     let home_power = ac_power - real_power;
 
+    let inverter_manufacturer = get_string_from_regs(&regs, 40004, 16);
+    let inverter_model = get_string_from_regs(&regs, 40020, 16);
+    let inverter_version = get_string_from_regs(&regs, 40044, 8);
+    let inverter_sn = get_string_from_regs(&regs, 40052, 16);
+    let inverter_sunspec_did = get_u16_from_regs(&regs, 40069);
+
+    let meter_manufacturer = get_string_from_regs(&regs, 40123, 16);
+    let meter_model = get_string_from_regs(&regs, 40139, 16);
+    let meter_option = get_string_from_regs(&regs, 40155, 8);
+    let meter_version = get_string_from_regs(&regs, 40163, 8);
+    let meter_sn = get_string_from_regs(&regs, 40171, 16);
+    let meter_sunspec_did = get_u16_from_regs(&regs, 40188);
+
     let mut body = "<body>".to_string();
     body = body + format!("<h1>{battery}</h1>").as_str();
 
     body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
     body = body + format!("<h1>AC produziert (gesamt)&colon; {ac_lifetime_energy_production_kwh:.2}kWh</h1>").as_str();
+    body = body + format!("Hersteller&colon; {inverter_manufacturer} Model&colon; {inverter_model}").as_str();
+    body = body + format!("<br/>Version&colon; {inverter_version} Seriennummer&colon; {inverter_sn} SunSpec DID&colon; {inverter_sunspec_did}").as_str();
 
     body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1>").as_str();
     body = body + format!("<h1>exportiert (gesamt)&colon; {total_exported_kwh:.2}kWh importiert (gesamt)&colon; {total_imported_kwh:.2}kWh</h1>").as_str();
+    body = body + format!("Hersteller&colon; {meter_manufacturer} Model&colon; {meter_model} option&colon; {meter_option}").as_str();
+    body = body + format!("<br/>Version&colon; {meter_version} Seriennummer&colon; {meter_sn} SunSpec DID&colon; {meter_sunspec_did}").as_str();
 
     body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Produktion&colon; {pv_power:.0}W (AC + Batterie)</h1>").as_str();
