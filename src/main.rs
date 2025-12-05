@@ -265,10 +265,16 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
 
     let mut body = "<body>".to_string();
     body = body + format!("<h1>{battery}</h1>").as_str();
+
+    body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
     body = body + format!("<h1>AC produziert (gesamt)&colon; {ac_lifetime_energy_production_kwh:.2}kWh</h1>").as_str();
+
+    body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Z&auml;hler&colon; {r_power} Frequenz {frequency:.2}Hz</h1>").as_str();
-    body = body + format!("<h1>exportiert (gesamt)&colon; {total_exported_kwh:.2}kWh importiert (gesamt) {total_imported_kwh:.2}kWh</h1>").as_str();
+    body = body + format!("<h1>exportiert (gesamt)&colon; {total_exported_kwh:.2}kWh importiert (gesamt)&colon; {total_imported_kwh:.2}kWh</h1>").as_str();
+
+    body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Produktion&colon; {pv_power:.0}W (AC + Batterie)</h1>").as_str();
     body = body + format!("<h1>Hausverbrauch&colon; {home_power:.0}W (AC - Z&auml;hler)</h1>").as_str();
     body = body + "</body>";
