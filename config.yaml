@@ -43,7 +43,7 @@ registerBlocks:
   # But they are static, not updated and might be used by other stuff.
   # inverter common block
   - startAddress: 40000
-    size: 63
+    size: 72
     update: false
   # meter 1 common block
   - startAddress: 40121
