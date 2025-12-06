@@ -309,8 +309,16 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     let meter_sn = get_string_from_regs(&regs, 40171, 16);
     let meter_sunspec_did = get_u16_from_regs(&regs, 40188);
 
+    let battery_manufacturer = get_string_from_regs(&regs, 0xf500, 16);
+    let battery_model = get_string_from_regs(&regs, 0xf510, 16);
+    let battery_fw = get_string_from_regs(&regs, 0xf520, 16);
+    let battery_sn = get_string_from_regs(&regs, 0xf530, 16);
+    let battery_did = get_u16_from_regs(&regs, 0xf540);
+
     let mut body = "<body>".to_string();
     body = body + format!("<h1>{battery}</h1>").as_str();
+    body = body + format!("Hersteller&colon; {battery_manufacturer} Model&colon; {battery_model}").as_str();
+    body = body + format!("<br/>Version&colon; {battery_fw} Seriennummer&colon; {battery_sn} DID&colon; {battery_did}").as_str();
 
     body = body + format!("<hr/>").as_str();
     body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
