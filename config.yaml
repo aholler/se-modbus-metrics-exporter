@@ -49,3 +49,7 @@ registerBlocks:
   - startAddress: 40121
     size: 69
     update: false
+  # battery 1 information block
+  - startAddress: 62720 # 0xf500
+    size: 65
+    update: false
