@@ -228,8 +228,16 @@ fn get_scaled_u32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, a
 
 fn v_u16_to_string(data: &Vec<u16>) -> String {
     let bytes: Vec<u8> = data.iter().fold(vec![], |mut x, elem| {
-        x.push((elem >> 8) as u8);
-        x.push((elem & 0xff) as u8);
+        let mut ch =  (elem >> 8) as u8;
+        if ch == 0 {
+            return x;
+        }
+        x.push(ch);
+        ch = (elem & 0xff) as u8;
+        if ch == 0 {
+            return x;
+        }
+        x.push(ch);
         x
     });
     String::from_utf8(bytes).unwrap()
