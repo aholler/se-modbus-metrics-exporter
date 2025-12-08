@@ -270,17 +270,7 @@ fn get_u16_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u1
 async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>>>) -> Html<String> {
     let regs = state.read().unwrap();
 
-    let battery_soc = get_f32_from_regs(&regs, 0xf584);
-    let battery_power = get_f32_from_regs(&regs, 0xf574);
-    let battery_health = get_f32_from_regs(&regs, 0xf582);
-
     let head = "<head><meta http-equiv='refresh' content='30'><title>PV-Status</title></head>";
-    let power = if battery_power < 0.0 {
-            format!("<font color='red'>{battery_power:.0}W</font>")
-        } else {
-            format!("<font color='green'>{battery_power:.0}W</font>")
-       };
-    let battery = format!("Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%");
 
     let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
     let ac = format!("AC {ac_power:.0}W");
@@ -301,7 +291,6 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
 
     let ac_lifetime_energy_production_kwh = get_scaled_u32_from_regs(&regs, 40093, 40095) / 1000.;
 
-    let pv_power = ac_power + battery_power;
     let home_power = ac_power - real_power;
 
     let inverter_manufacturer = get_string_from_regs(&regs, 40004, 16);
@@ -317,18 +306,45 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     let meter_sn = get_string_from_regs(&regs, 40171, 16);
     let meter_sunspec_did = get_u16_from_regs(&regs, 40188);
 
-    let battery_manufacturer = get_string_from_regs(&regs, 0xf500, 16);
-    let battery_model = get_string_from_regs(&regs, 0xf510, 16);
-    let battery_fw = get_string_from_regs(&regs, 0xf520, 16);
-    let battery_sn = get_string_from_regs(&regs, 0xf530, 16);
-    let battery_did = get_u16_from_regs(&regs, 0xf540);
+    let mut pv_power = ac_power;
+
+    let mut battery_base : u16 = 0;
+    let mut battery_manufacturer = get_string_from_regs(&regs, 0xe100, 16);
+    battery_manufacturer = battery_manufacturer.trim().to_string();
+    if battery_manufacturer == "SolarEdge" {
+        battery_base = 0xe100;
+    } else {
+        battery_manufacturer = get_string_from_regs(&regs, 0xf500, 16);
+        if battery_manufacturer == "SolarEdge" {
+            battery_base = 0xf500;
+        }
+    }
 
     let mut body = "<body>".to_string();
-    body = body + format!("<h1>{battery}</h1>").as_str();
-    body = body + format!("Hersteller&colon; {battery_manufacturer} Model&colon; {battery_model}").as_str();
-    body = body + format!("<br/>Version&colon; {battery_fw} Seriennummer&colon; {battery_sn} DID&colon; {battery_did}").as_str();
 
-    body = body + format!("<hr/>").as_str();
+    if battery_base > 0 {
+        let battery_power = get_f32_from_regs(&regs, battery_base + 0x74);
+        let battery_health = get_f32_from_regs(&regs, battery_base + 0x82);
+        let battery_soc = get_f32_from_regs(&regs, battery_base + 0x84);
+        let power = if battery_power < 0.0 {
+                format!("<font color='red'>{battery_power:.0}W</font>")
+            } else {
+                format!("<font color='green'>{battery_power:.0}W</font>")
+            };
+        let battery = format!("Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%");
+
+        pv_power += battery_power;
+
+        let battery_model = get_string_from_regs(&regs, battery_base + 0x10, 16);
+        let battery_fw = get_string_from_regs(&regs, battery_base + 0x20, 16);
+        let battery_sn = get_string_from_regs(&regs, battery_base + 0x30, 16);
+        let battery_did = get_u16_from_regs(&regs, battery_base + 0x40);
+        body = body + format!("<h1>{battery}</h1>").as_str();
+        body = body + format!("Hersteller&colon; {battery_manufacturer} Model&colon; {battery_model}").as_str();
+        body = body + format!("<br/>Version&colon; {battery_fw} Seriennummer&colon; {battery_sn} DID&colon; {battery_did}").as_str();
+        body = body + format!("<hr/>").as_str();
+    }
+
     body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
     body = body + format!("<h1>AC produziert (gesamt)&colon; {ac_lifetime_energy_production_kwh:.2}kWh</h1>").as_str();
     body = body + format!("Hersteller&colon; {inverter_manufacturer} Model&colon; {inverter_model}").as_str();
@@ -341,8 +357,16 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     body = body + format!("<br/>Version&colon; {meter_version} Seriennummer&colon; {meter_sn} SunSpec DID&colon; {meter_sunspec_did}").as_str();
 
     body = body + format!("<hr/>").as_str();
-    body = body + format!("<h1>Produktion&colon; {pv_power:.0}W (AC + Batterie)</h1>").as_str();
+
+    body = body + format!("<h1>Produktion&colon; {pv_power:.0}W").as_str();
+    if battery_base > 0 {
+        body = body + format!(" (AC + Batterie)</h1>").as_str();
+    } else {
+        body = body + format!(" (AC)</h1>").as_str();
+    }
+
     body = body + format!("<h1>Hausverbrauch&colon; {home_power:.0}W (AC - Z&auml;hler)</h1>").as_str();
+
     body = body + "</body>";
     ("<!doctype html><html lang='de'>".to_owned() + head + &body + "</html>").into()
 }
@@ -367,15 +391,28 @@ async fn metrics(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
     response = response + "# TYPE sunspec_inverter_three_phase_WH_Wh counter\n";
     response = response + format!("sunspec_inverter_three_phase_WH_Wh {ac_lifetime_energy_production_wh:.0}\n").as_str();
 
-    let battery_soc = get_f32_from_regs(&regs, 0xf584);
-    response = response + "# HELP solaredge_Battery_1_State_of_Energy_Pct\\nPct (Percent)\n";
-    response = response + "# TYPE solaredge_Battery_1_State_of_Energy_Pct gauge\n";
-    response = response + format!("solaredge_Battery_1_State_of_Energy_Pct {battery_soc:.0}\n").as_str();
+    let mut battery_base : u16 = 0;
+    let mut battery_manufacturer = get_string_from_regs(&regs, 0xe100, 16);
+    if battery_manufacturer == "SolarEdge" {
+        battery_base = 0xe100;
+    } else {
+        battery_manufacturer = get_string_from_regs(&regs, 0xf500, 16);
+        if battery_manufacturer == "SolarEdge" {
+            battery_base = 0xf500;
+        }
+    }
 
-    let battery_power = get_f32_from_regs(&regs, 0xf574);
-    response = response + "# HELP solaredge_Battery_1_Instantaneous_Power_W_W\\nW (Watts)\n";
-    response = response + "# TYPE solaredge_Battery_1_Instantaneous_Power_W_W gauge\n";
-    response = response + format!("solaredge_Battery_1_Instantaneous_Power_W_W {battery_power:.0}\n").as_str();
+    if battery_base > 0 {
+        let battery_soc = get_f32_from_regs(&regs, battery_base + 0x84);
+        response = response + "# HELP solaredge_Battery_1_State_of_Energy_Pct\\nPct (Percent)\n";
+        response = response + "# TYPE solaredge_Battery_1_State_of_Energy_Pct gauge\n";
+        response = response + format!("solaredge_Battery_1_State_of_Energy_Pct {battery_soc:.0}\n").as_str();
+
+        let battery_power = get_f32_from_regs(&regs, battery_base + 0x74);
+        response = response + "# HELP solaredge_Battery_1_Instantaneous_Power_W_W\\nW (Watts)\n";
+        response = response + "# TYPE solaredge_Battery_1_Instantaneous_Power_W_W gauge\n";
+        response = response + format!("solaredge_Battery_1_Instantaneous_Power_W_W {battery_power:.0}\n").as_str();
+    }
 
     let total_exported_wh = get_scaled_u32_from_regs(&regs, 40226, 40242);
     response = response + "# HELP sunspec_ac_meter_abcn_TotWhExp_Wh Model 203, ac_meter_abcn (wye-connect three phase (abcn) meter)\\nTotWhExp (Total Watt-hours Exported): Total Real Energy Exported\n";
