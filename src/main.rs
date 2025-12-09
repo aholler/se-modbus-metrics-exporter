@@ -259,7 +259,7 @@ fn get_u16_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u1
     for block in register_blocks {
         let start_addr = block.read().unwrap().start_address;
         let len = block.read().unwrap().registers.len();
-        if addr >= start_addr && usize::from(addr + 2) <= usize::from(start_addr) + len {
+        if addr >= start_addr && usize::from(addr + 1) <= usize::from(start_addr) + len {
             let data = &block.read().unwrap().registers;
             return data[usize::from(addr-start_addr)];
         }
