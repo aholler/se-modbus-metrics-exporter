@@ -182,6 +182,7 @@ fn get_f32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u1
             return v_u16_to_f32(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+2)].to_vec());
         }
     }
+    eprintln!("f32 at {addr} not readable!");
     0.0
 }
 
@@ -199,6 +200,7 @@ fn get_scaled_f32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, a
             return scale(data[usize::from(addr-start_addr)], data[usize::from(scale_addr-start_addr)]);
         }
     }
+    eprintln!("scaled f32 at {addr} with scale factor at {scale_addr} not readable!");
     0.0
 }
 
@@ -223,6 +225,7 @@ fn get_scaled_u32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, a
             return scale_u32(v_u16_to_u32(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+2)].to_vec()), data[usize::from(scale_addr-start_addr)]);
         }
     }
+    eprintln!("scaled u32 at {addr} with scale factor at {scale_addr} not readable!");
     0.0
 }
 
@@ -252,6 +255,7 @@ fn get_string_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr:
             return v_u16_to_string(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+size)].to_vec());
         }
     }
+    eprintln!("string with {size} characters at {addr} not readable!");
     "".to_string()
 }
 
@@ -264,6 +268,7 @@ fn get_u16_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u1
             return data[usize::from(addr-start_addr)];
         }
     }
+    eprintln!("u16 at {addr} not readable!");
     0
 }
 
