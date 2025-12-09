@@ -67,11 +67,11 @@ impl Config {
     }
 }
 
-struct ExampleService {
+struct ModbusServerService {
     register_blocks: Vec<Arc<RwLock<RegisterBlock>>>,
 }
 
-impl tokio_modbus::server::Service for ExampleService {
+impl tokio_modbus::server::Service for ModbusServerService {
     type Request = Request<'static>;
     type Response = Response;
     type Exception = ExceptionCode;
@@ -93,7 +93,7 @@ impl tokio_modbus::server::Service for ExampleService {
     }
 }
 
-impl ExampleService {
+impl ModbusServerService {
     fn new(register_blocks: Vec<Arc<RwLock<RegisterBlock>>>) -> Self {
         Self {
             register_blocks: register_blocks.clone(),
@@ -123,7 +123,7 @@ async fn server_context(socket_addr: SocketAddr, register_blocks: &Vec<Arc<RwLoc
     loop {
         let listener = TcpListener::bind(socket_addr).await?;
         let server = tokio_modbus::server::tcp::Server::new(listener);
-        let new_service = |_socket_addr| Ok(Some(ExampleService::new(register_blocks.clone())));
+        let new_service = |_socket_addr| Ok(Some(ModbusServerService::new(register_blocks.clone())));
         let on_connected = |stream, socket_addr| async move {
             accept_tcp_connection(stream, socket_addr, new_service)
         };
@@ -272,22 +272,19 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
 
     let head = "<head><meta http-equiv='refresh' content='30'><title>PV-Status</title></head>";
 
-    let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
-    let ac = format!("AC {ac_power:.0}W");
+    let ac_power = get_scaled_f32_from_regs(&regs, 40083, 40084);
+    let dc_power = get_scaled_f32_from_regs(&regs, 40100, 40101);
 
-    let dc_power = get_scaled_f32_from_regs(&regs, 40071+29, 40071+30);
-    let dc = format!("DC {dc_power:.0}W");
-
-    let real_power = get_scaled_f32_from_regs(&regs, 40190+16, 40190+20);
+    let real_power = get_scaled_f32_from_regs(&regs, 40206, 40210);
     let r_power = if real_power < 0.0 {
             format!("<font color='red'>{real_power:.0}W</font>") // vom Netz
         } else {
             format!("<font color='green'>{real_power:.0}W</font>") // Einspeisung
        };
 
-    let frequency = get_scaled_f32_from_regs(&regs, 40190+14, 40190+15);
-    let total_exported_kwh = get_scaled_u32_from_regs(&regs, 40226, 40242)/1000.;
-    let total_imported_kwh = get_scaled_u32_from_regs(&regs, 40234, 40242)/1000.;
+    let frequency = get_scaled_f32_from_regs(&regs, 40204, 40205);
+    let total_exported_kwh = get_scaled_u32_from_regs(&regs, 40226, 40242) / 1000.;
+    let total_imported_kwh = get_scaled_u32_from_regs(&regs, 40234, 40242) / 1000.;
 
     let ac_lifetime_energy_production_kwh = get_scaled_u32_from_regs(&regs, 40093, 40095) / 1000.;
 
@@ -331,7 +328,6 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
             } else {
                 format!("<font color='green'>{battery_power:.0}W</font>")
             };
-        let battery = format!("Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%");
 
         pv_power += battery_power;
 
@@ -339,13 +335,13 @@ async fn handler(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
         let battery_fw = get_string_from_regs(&regs, battery_base + 0x20, 16);
         let battery_sn = get_string_from_regs(&regs, battery_base + 0x30, 16);
         let battery_did = get_u16_from_regs(&regs, battery_base + 0x40);
-        body = body + format!("<h1>{battery}</h1>").as_str();
+        body = body + format!("<h1>Batterie&colon; Ladezustand {battery_soc:.0}% Leistung {power} health {battery_health:.0}%</h1>").as_str();
         body = body + format!("Hersteller&colon; {battery_manufacturer} Model&colon; {battery_model}").as_str();
         body = body + format!("<br/>Version&colon; {battery_fw} Seriennummer&colon; {battery_sn} DID&colon; {battery_did}").as_str();
         body = body + format!("<hr/>").as_str();
     }
 
-    body = body + format!("<h1>Wechselrichter&colon; {ac} {dc}</h1>").as_str();
+    body = body + format!("<h1>Wechselrichter&colon; AC {ac_power:.0}W DC {dc_power:.0}W</h1>").as_str();
     body = body + format!("<h1>AC produziert (gesamt)&colon; {ac_lifetime_energy_production_kwh:.2}kWh</h1>").as_str();
     body = body + format!("Hersteller&colon; {inverter_manufacturer} Model&colon; {inverter_model}").as_str();
     body = body + format!("<br/>Version&colon; {inverter_version} Seriennummer&colon; {inverter_sn} SunSpec DID&colon; {inverter_sunspec_did}").as_str();
@@ -376,12 +372,12 @@ async fn metrics(State(state): State<Arc<RwLock<Vec<Arc<RwLock<RegisterBlock>>>>
 
     let mut response = "".to_string();
 
-    let real_power = get_scaled_f32_from_regs(&regs, 40190+16, 40190+20);
+    let real_power = get_scaled_f32_from_regs(&regs, 40206, 40210);
     response = response + "# HELP sunspec_ac_meter_abcn_W_W Model 203, ac_meter_abcn (wye-connect three phase (abcn) meter)\\nW (Watts): Total Real Power\n";
     response = response + "# TYPE sunspec_ac_meter_abcn_W_W gauge\n";
     response = response + format!("sunspec_ac_meter_abcn_W_W {real_power:.0}\n").as_str();
 
-    let ac_power = get_scaled_f32_from_regs(&regs, 40071+12, 40071+13);
+    let ac_power = get_scaled_f32_from_regs(&regs, 40083, 40084);
     response = response + "# HELP sunspec_inverter_three_phase_W_W Model 103, inverter_three_phase (Inverter (Three Phase))\\nW (Watts): AC Power\n";
     response = response + "# TYPE sunspec_inverter_three_phase_W_W gauge\n";
     response = response + format!("sunspec_inverter_three_phase_W_W {ac_power:.0}\n").as_str();
