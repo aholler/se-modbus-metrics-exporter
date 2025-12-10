@@ -255,7 +255,7 @@ fn get_string_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr:
             return v_u16_to_string(&data[usize::from(addr-start_addr)..usize::from(addr-start_addr+size)].to_vec());
         }
     }
-    eprintln!("string with {size} characters at {addr} not readable!");
+    //eprintln!("string with {size} characters at {addr} not readable!");
     "".to_string()
 }
 
