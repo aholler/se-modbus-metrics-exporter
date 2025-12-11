@@ -170,7 +170,7 @@ fn v_u16_to_f32(data: &Vec<u16>) -> f32 {
         x
     });
     let b: [u8; 4] = bytes.try_into().unwrap();
-    return f32::from_ne_bytes(b);
+    return f32::from_le_bytes(b);
 }
 
 fn get_f32_from_regs(register_blocks: &Vec<Arc<RwLock<RegisterBlock>>>, addr: u16) -> f32 {
