@@ -1,7 +1,7 @@
 //
-// Written 2025 by Alexander Holler
+// Written 2025, 2026 by Alexander Holler
 //
-// SPDX-FileCopyrightText: Copyright (c) 2025 Alexander Holler <holler@ahsoftware.de>
+// SPDX-FileCopyrightText: Copyright (c) 2025, 2026 Alexander Holler <holler@ahsoftware.de>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use tokio;
