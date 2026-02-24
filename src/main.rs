@@ -468,6 +468,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n{} v{}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 
+    ctrlc::set_handler(move || {
+        println!("Received signal, terminating");
+        std::process::exit(0);
+    })
+    .expect("Error setting signal handler");
+
     let args: Vec<String> = env::args().collect();
 
     let my_name = &args[0];

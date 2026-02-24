@@ -7,6 +7,7 @@ version = "1.4.1"
 edition = "2021"
 
 [dependencies]
+ctrlc = { version = "^3", features = [ "termination" ] }
 tokio = { version = "^1", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
 tokio-modbus = { version = "^0.17", default-features = false, features = ["tcp", "tcp-server"] }
 anyhow = "^1.0"
